@@ -19,9 +19,15 @@ final class Config {
 
 	public const OPTION_DEFAULT_MODEL = 'litellm_default_model';
 
+	public const OPTION_REQUEST_TIMEOUT = 'litellm_request_timeout';
+
 	public const ENV_BASE_URL = 'LITELLM_API_BASE';
 
+	public const ENV_REQUEST_TIMEOUT = 'LITELLM_REQUEST_TIMEOUT';
+
 	public const DEFAULT_BASE_URL = 'http://localhost:4000/v1';
+
+	public const DEFAULT_REQUEST_TIMEOUT = 30.0;
 
 	/**
 	 * Resolves the LiteLLM API base URL.
@@ -49,5 +55,24 @@ final class Config {
 		$option = get_option( self::OPTION_DEFAULT_MODEL, '' );
 
 		return is_string( $option ) ? $option : '';
+	}
+
+	/**
+	 * Resolves the text generation request timeout, in seconds.
+	 */
+	public static function requestTimeout(): float {
+		$option = get_option( self::OPTION_REQUEST_TIMEOUT, '' );
+
+		if ( is_numeric( $option ) && (float) $option > 0 ) {
+			return (float) $option;
+		}
+
+		$env = getenv( self::ENV_REQUEST_TIMEOUT );
+
+		if ( is_string( $env ) && is_numeric( $env ) && (float) $env > 0 ) {
+			return (float) $env;
+		}
+
+		return self::DEFAULT_REQUEST_TIMEOUT;
 	}
 }

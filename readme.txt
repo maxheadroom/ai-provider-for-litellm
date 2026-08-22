@@ -4,7 +4,7 @@ Tags: ai, litellm, ollama, ai-client
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,14 +20,16 @@ Once activated, the provider is automatically picked up by WordPress core's Conn
 
 * **API Key** — set on **Settings → Connectors**, or via the `LITELLM_API_KEY` environment variable / PHP constant.
 * **API Base URL** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_API_BASE` environment variable. Defaults to `http://localhost:4000/v1`.
+* **Request Timeout** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_REQUEST_TIMEOUT` environment variable (seconds). Defaults to 30. Applies to text generation requests only; increase it if you're using slower local models that take longer than 30 seconds to respond.
 
-Precedence for both is: WordPress option, then environment variable / constant, then default.
+Precedence for all three is: WordPress option, then environment variable / constant, then default.
 
 = Known limitations (v1) =
 
 * **No streaming.** The SDK's OpenAI-compatible text generation base class sends and parses one full response per request; there is no chunked/SSE code path to hook into.
 * **No image generation/description, embeddings, or other modalities yet.** Only chat-style text generation is implemented in this version.
-* **No custom retry/backoff.** Requests use explicit timeouts (30s request / 10s connect) but a failed request is not automatically retried.
+* **No custom retry/backoff.** Requests use the configured timeout (see above) but a failed or timed-out request is not automatically retried.
+* **Model discovery requests (`GET /v1/models`) have no explicit timeout**, unlike text generation — they use WordPress core's own default HTTP timeout (5 seconds, filterable via the `http_request_timeout` core filter), which can be tight for a slow or cold-starting LiteLLM instance.
 * Because LiteLLM can proxy arbitrary, differently-named underlying models, this plugin cannot infer each model's true capabilities from its ID the way a single-vendor provider can. Every model returned by `GET /v1/models` is assumed to support text generation, unless its ID contains "embed", in which case it's assumed to be an embedding model instead.
 
 == Installation ==
@@ -37,6 +39,10 @@ Precedence for both is: WordPress option, then environment variable / constant, 
 3. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
 
 == Changelog ==
+
+= 0.1.1 =
+* Make the text generation request timeout configurable (Settings → LiteLLM Provider, or `LITELLM_REQUEST_TIMEOUT`), default unchanged at 30 seconds.
+* Remove the connect-timeout setting: confirmed it had no effect under WordPress's own HTTP client, which only supports a single overall request timeout.
 
 = 0.1.0 =
 * Initial release: text generation, model discovery/availability, and base-URL/default-model settings.

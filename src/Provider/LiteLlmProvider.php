@@ -32,16 +32,6 @@ final class LiteLlmProvider extends AbstractApiProvider {
 	public const ID = 'litellm';
 
 	/**
-	 * Request timeout in seconds. See SPEC §4.2.
-	 */
-	private const REQUEST_TIMEOUT = 30.0;
-
-	/**
-	 * Connection timeout in seconds. See SPEC §4.2.
-	 */
-	private const CONNECT_TIMEOUT = 10.0;
-
-	/**
 	 * {@inheritDoc}
 	 */
 	protected static function baseUrl(): string {
@@ -99,12 +89,18 @@ final class LiteLlmProvider extends AbstractApiProvider {
 	}
 
 	/**
-	 * Builds the request options (timeouts) used for outgoing HTTP requests.
+	 * Builds the request options (timeout) used for outgoing HTTP requests.
+	 *
+	 * Only a request timeout is set. A connect timeout was previously set here too, but
+	 * WordPress's own PSR-18 client adapter (WP_AI_Client_HTTP_Client, which wraps
+	 * wp_safe_remote_request()) only maps RequestOptions::getTimeout() and
+	 * getMaxRedirects() to WP HTTP API args -- there's no separate connect-timeout
+	 * concept in wp_remote_request(), so a configured connect timeout was silently
+	 * having no effect in a real WordPress environment.
 	 */
 	private static function createRequestOptions(): RequestOptions {
 		$options = new RequestOptions();
-		$options->setTimeout( self::REQUEST_TIMEOUT );
-		$options->setConnectTimeout( self::CONNECT_TIMEOUT );
+		$options->setTimeout( Config::requestTimeout() );
 		return $options;
 	}
 }
