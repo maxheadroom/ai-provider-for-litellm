@@ -60,6 +60,26 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 		);
 	}
 
+	public function test_text_generation_models_declare_json_output_support(): void {
+		$response = $this->jsonResponse(
+			[
+				'data' => [
+					[ 'id' => 'ollama/llama3' ],
+				],
+			]
+		);
+
+		$models = $this->parse( $response );
+
+		$optionNames = array_map(
+			static fn( $option ) => $option->getName()->value,
+			$models[0]->getSupportedOptions()
+		);
+
+		$this->assertContains( 'outputMimeType', $optionNames );
+		$this->assertContains( 'outputSchema', $optionNames );
+	}
+
 	public function test_classifies_embedding_models_by_id_substring(): void {
 		$response = $this->jsonResponse(
 			[

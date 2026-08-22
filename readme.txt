@@ -4,7 +4,7 @@ Tags: ai, litellm, ollama, ai-client
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.2
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ This plugin registers a `litellm` provider with the WordPress PHP AI Client SDK,
 
 Once activated, the provider is automatically picked up by WordPress core's Connectors API (WP 7.0+): it appears on **Settings → Connectors** as "LiteLLM (Ollama)", where you can enter your LiteLLM API key. The gateway's base URL, a default model, and vision-capable models are configured separately on **Settings → LiteLLM Provider**.
 
-Text generation supports image input (i.e. describing an image in text, such as generating alt text) for any model you mark as vision-capable — see "Image description generation" below.
+Text generation supports image input (i.e. describing an image in text, such as generating alt text) for any model you mark as vision-capable — see "Image description generation" below. It also supports structured JSON output, required by several of WordPress core's built-in AI features (Content Classification/tag suggestions, Type Ahead, and others that request a specific response schema).
 
 = Configuration =
 
@@ -57,6 +57,10 @@ Whether the underlying model actually produces a useful description is up to tha
 3. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
 
 == Changelog ==
+
+= 0.3.0 =
+* Add structured JSON output support (declare `outputMimeType`/`outputSchema` capability), required by several built-in WP AI features -- e.g. Content Classification/tag suggestions previously failed outright with "Term generation failed. Please ensure you have a connected provider that supports text generation." because this provider never declared the capability at all.
+* Fix a request-format bug in the SDK's own JSON-schema handling: it places the raw schema directly under `response_format.json_schema`, but OpenAI's actual API (and OpenAI-compatible backends like LiteLLM) expect it wrapped in a `{name, schema}` object. Confirmed live against a real LiteLLM/Ollama backend: the unwrapped form was silently ignored (producing invalid, markdown-fenced non-JSON output); the corrected form produces proper schema-conformant JSON.
 
 = 0.2.2 =
 * Raise WordPress core's `wp_ai_client_default_request_timeout` filter to match the configured Request Timeout. Previously, any generation triggered through a built-in WP AI feature (Content Resizing, Alt Text Generation, etc. -- including image description generation below) silently ignored this plugin's Request Timeout setting entirely, because WP core's own prompt-builder wrapper applies a hardcoded 30-second default that takes precedence over a provider's own configured timeout.

@@ -98,4 +98,43 @@ final class LiteLlmTextGenerationModelTest extends TestCase {
 
 		$this->assertSame( 'https://litellm.example.com/v1/chat/completions', $request->getUri() );
 	}
+
+	public function test_prepare_response_format_param_wraps_schema_with_name_and_schema_keys(): void {
+		$model = $this->makeModel();
+
+		$schema = [
+			'type'       => 'object',
+			'properties' => [ 'suggestions' => [ 'type' => 'array' ] ],
+		];
+
+		$ref = new ReflectionMethod( $model, 'prepareResponseFormatParam' );
+		$result = $ref->invoke( $model, $schema );
+
+		$this->assertSame(
+			[
+				'type'        => 'json_schema',
+				'json_schema' => [
+					'name'   => 'response',
+					'schema' => $schema,
+				],
+			],
+			$result
+		);
+	}
+
+	public function test_prepare_response_format_param_falls_back_to_json_object_without_schema(): void {
+		$model = $this->makeModel();
+
+		$ref = new ReflectionMethod( $model, 'prepareResponseFormatParam' );
+		$result = $ref->invoke( $model, null );
+
+		$this->assertSame( [ 'type' => 'json_object' ], $result );
+	}
+
+	private function makeModel(): LiteLlmTextGenerationModel {
+		$modelMetadata = new ModelMetadata( 'ollama/llama3', 'ollama/llama3', [], [] );
+		$providerMetadata = new ProviderMetadata( 'litellm', 'LiteLLM (Ollama)', ProviderTypeEnum::server() );
+
+		return new LiteLlmTextGenerationModel( $modelMetadata, $providerMetadata );
+	}
 }

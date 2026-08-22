@@ -116,6 +116,12 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 			new SupportedOption( OptionEnum::stopSequences() ),
 			new SupportedOption( OptionEnum::systemInstruction() ),
 			new SupportedOption( OptionEnum::functionDeclarations() ),
+			// JSON-mode/structured output (WordPress core's own Content Classification,
+			// Type Ahead, etc. abilities require this to consider a provider usable at
+			// all). See LiteLlmTextGenerationModel::prepareResponseFormatParam() for the
+			// corrected request envelope this relies on.
+			new SupportedOption( OptionEnum::outputMimeType() ),
+			new SupportedOption( OptionEnum::outputSchema() ),
 		];
 	}
 

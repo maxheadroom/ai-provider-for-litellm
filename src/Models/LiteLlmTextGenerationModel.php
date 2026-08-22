@@ -63,4 +63,31 @@ final class LiteLlmTextGenerationModel extends AbstractOpenAiCompatibleTextGener
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- set_time_limit() has no error return to check; suppressing avoids a warning when hosts disable it via disable_functions.
 		@set_time_limit( (int) ceil( $timeout ) + self::EXECUTION_TIME_BUFFER );
 	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Overridden to fix a request-format bug in the SDK's base implementation: it places
+	 * the raw JSON schema directly as the value of `json_schema`, but OpenAI's actual API
+	 * (and OpenAI-compatible backends like LiteLLM that follow it) expects it wrapped in
+	 * an object with `name`/`schema` keys. Confirmed live against a real LiteLLM/Ollama
+	 * backend: the SDK's unwrapped envelope is silently ignored (the model falls back to
+	 * free-form, markdown-fenced output that isn't valid JSON), while this wrapped form
+	 * is correctly honored and produces schema-conformant JSON.
+	 */
+	protected function prepareResponseFormatParam( ?array $outputSchema ): array {
+		if ( is_array( $outputSchema ) ) {
+			return [
+				'type'        => 'json_schema',
+				'json_schema' => [
+					'name'   => 'response',
+					'schema' => $outputSchema,
+				],
+			];
+		}
+
+		return [
+			'type' => 'json_object',
+		];
+	}
 }
