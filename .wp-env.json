@@ -1,0 +1,15 @@
+{
+	"core": null,
+	"testsEnvironment": false,
+	"port": 8989,
+	"phpVersion": "8.2",
+	"plugins": [
+		".",
+		"WordPress/ai#develop"
+	],
+	"config": {
+		"WP_DEBUG": true,
+		"WP_DEBUG_LOG": true,
+		"WP_DEBUG_DISPLAY": false
+	}
+}

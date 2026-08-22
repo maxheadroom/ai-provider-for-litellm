@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<ruleset name="AI Provider for LiteLLM">
+	<description>Coding standards for the ai-provider-for-litellm plugin.</description>
+
+	<file>.</file>
+	<exclude-pattern>/vendor/*</exclude-pattern>
+	<exclude-pattern>/node_modules/*</exclude-pattern>
+
+	<arg value="sp"/>
+	<arg name="basepath" value="."/>
+	<arg name="colors"/>
+	<arg name="extensions" value="php"/>
+
+	<rule ref="WordPress">
+		<exclude name="WordPress.Files.FileName"/>
+		<!--
+			This plugin's classes override methods/parameters declared by the
+			wordpress/php-ai-client SDK, which uses camelCase throughout (as do
+			the official OpenAI/Anthropic provider plugins). Enforcing snake_case
+			here would conflict with matching the SDK's own established convention.
+		-->
+		<exclude name="WordPress.NamingConventions.ValidVariableName"/>
+		<exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+		<!-- Short array syntax is standard in this codebase and in the SDK itself. -->
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+		<!--
+			@inheritDoc is used for methods overriding an SDK abstract method; the
+			parameter/exception documentation lives on the abstract declaration.
+		-->
+		<exclude name="Squiz.Commenting.FunctionComment.MissingParamTag"/>
+		<exclude name="Squiz.Commenting.FunctionCommentThrowTag.Missing"/>
+	</rule>
+
+	<!-- $modelId is a private-method-local variable name, not a class name; not a WP reserved keyword clash. -->
+	<rule ref="Universal.NamingConventions.NoReservedKeywordParameterNames">
+		<exclude-pattern>src/autoload.php</exclude-pattern>
+	</rule>
+
+	<config name="testVersion" value="7.4-"/>
+	<config name="minimum_supported_wp_version" value="7.0"/>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="WordPress\LiteLLMAiProvider"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>
