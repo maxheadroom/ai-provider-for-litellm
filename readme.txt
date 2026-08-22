@@ -4,7 +4,7 @@ Tags: ai, litellm, ollama, ai-client
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,13 +16,14 @@ This plugin registers a `litellm` provider with the WordPress PHP AI Client SDK,
 
 Once activated, the provider is automatically picked up by WordPress core's Connectors API (WP 7.0+): it appears on **Settings → Connectors** as "LiteLLM (Ollama)", where you can enter your LiteLLM API key. The gateway's base URL, a default model, and vision-capable models are configured separately on **Settings → LiteLLM Provider**.
 
-Text generation supports image input (i.e. describing an image in text, such as generating alt text) for any model you mark as vision-capable — see "Image description generation" below. It also supports structured JSON output, required by several of WordPress core's built-in AI features (Content Classification/tag suggestions, Type Ahead, and others that request a specific response schema).
+Text generation supports image input (i.e. describing an image in text, such as generating alt text) for any model you mark as vision-capable — see "Image description generation" below. It also supports structured JSON output for any model you mark as structured-output-capable, required by several of WordPress core's built-in AI features (Content Classification/tag suggestions, Type Ahead, and others that request a specific response schema) — see "Structured JSON output" below.
 
 = Configuration =
 
 * **API Key** — set on **Settings → Connectors**, or via the `LITELLM_API_KEY` environment variable / PHP constant.
 * **API Base URL** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_API_BASE` environment variable. Defaults to `http://localhost:4000/v1`.
 * **Vision-Capable Models** — set on **Settings → LiteLLM Provider**: a list of model IDs (one per line, or comma-separated) that accept image input.
+* **Structured Output-Capable Models** — set on **Settings → LiteLLM Provider**: a list of model IDs that reliably return valid, schema-conformant JSON.
 * **Request Timeout** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_REQUEST_TIMEOUT` environment variable (seconds). Defaults to 30. Applies to text generation requests only; increase it if you're using slower local models that take longer than 30 seconds to respond. The plugin also raises PHP's own `max_execution_time` to match before sending the request (see below), since that would otherwise cut a request short regardless of this setting, and raises WordPress core's site-wide default AI request timeout to at least this value (see below), since core's own built-in AI features (Content Resizing, Alt Text Generation, etc.) otherwise ignore this setting entirely.
 
 Precedence for the API key, base URL, and request timeout is: WordPress option, then environment variable / constant, then default.
@@ -39,6 +40,17 @@ A model is treated as vision-capable if either is true:
 In practice, LiteLLM rarely knows a self-hosted/proxied model's capabilities on its own (its cost/capability database only recognizes well-known hosted model IDs) — so for most Ollama-backed deployments, the **Vision-Capable Models** setting is the only reliable way to enable this. There is no name-based guessing: an unlisted model is always treated as text-only, to avoid silently sending image data to a model that can't use it. If `/model/info` isn't available on your LiteLLM deployment (older versions, or an API key without access to it), automatic detection is simply skipped — the manual list still works.
 
 Whether the underlying model actually produces a useful description is up to that model/backend, not this plugin — Ollama vision models (e.g. `llava`, or vision-capable Gemma/Llama variants) are required for a meaningful result; text-only models will be rejected by LiteLLM with a "does not support multimodal requests" error if selected.
+
+= Structured JSON output =
+
+Several built-in WordPress AI features ask for a response matching a specific JSON schema (e.g. Content Classification's tag/category suggestions). Only models you mark as structured-output-capable are considered for these -- an unlisted model isn't offered at all, so those features fail with a clear "no connected provider that supports text generation" error rather than a model silently ignoring the schema.
+
+Mark a model as structured-output-capable if either is true:
+
+* It's listed in the **Structured Output-Capable Models** setting, or
+* LiteLLM's own `GET /model/info` endpoint reports `supports_response_schema: true` for it.
+
+As with vision, LiteLLM's own metadata is unreliable for self-hosted models (it's `null` for arbitrary Ollama models on every deployment tested so far), so the manual list is what actually matters in practice. Unlike vision, there's no clear error if a model that *shouldn't* be on the list gets added anyway -- verify a candidate model first, since not every model reliably honors `response_format`, even behind the exact same LiteLLM/Ollama backend as a model that does. A model that ignores it entirely returns free-form prose instead of JSON, which then fails to parse on the WordPress side with an error like "Could not parse AI response as valid suggestions" -- if you see that, the model you're using (or the one WordPress auto-selected, if none was requested by name) most likely doesn't actually support structured output and shouldn't be on this list.
 
 = Known limitations =
 
@@ -57,6 +69,9 @@ Whether the underlying model actually produces a useful description is up to tha
 3. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
 
 == Changelog ==
+
+= 0.3.1 =
+* Make structured JSON output opt-in per model (new Structured Output-Capable Models setting), instead of declaring it for every discovered model. Confirmed live: not every self-hosted model reliably honors `response_format` even behind the exact same LiteLLM/Ollama backend as one that does -- an incapable model auto-selected by WordPress's resolver returned free-form prose instead of JSON, which then failed downstream parsing with "Could not parse AI response as valid suggestions." This mirrors the existing Vision-Capable Models pattern (manual list, unioned with LiteLLM's `/model/info` `supports_response_schema` flag when available).
 
 = 0.3.0 =
 * Add structured JSON output support (declare `outputMimeType`/`outputSchema` capability), required by several built-in WP AI features -- e.g. Content Classification/tag suggestions previously failed outright with "Term generation failed. Please ensure you have a connected provider that supports text generation." because this provider never declared the capability at all.

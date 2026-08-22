@@ -21,6 +21,8 @@ final class Config {
 
 	public const OPTION_VISION_MODELS = 'litellm_vision_models';
 
+	public const OPTION_JSON_MODELS = 'litellm_json_models';
+
 	public const OPTION_REQUEST_TIMEOUT = 'litellm_request_timeout';
 
 	public const ENV_BASE_URL = 'LITELLM_API_BASE';
@@ -65,7 +67,26 @@ final class Config {
 	 * @return array<string, true> Model IDs as keys, for O(1) lookup.
 	 */
 	public static function visionModelIds(): array {
-		$option = get_option( self::OPTION_VISION_MODELS, '' );
+		return self::parseModelIdList( self::OPTION_VISION_MODELS );
+	}
+
+	/**
+	 * Resolves the admin-configured list of model IDs known to reliably honor
+	 * structured JSON output (`response_format`).
+	 *
+	 * @return array<string, true> Model IDs as keys, for O(1) lookup.
+	 */
+	public static function jsonModelIds(): array {
+		return self::parseModelIdList( self::OPTION_JSON_MODELS );
+	}
+
+	/**
+	 * Reads a WP option containing a comma/newline-separated list of model IDs.
+	 *
+	 * @return array<string, true> Model IDs as keys, for O(1) lookup.
+	 */
+	private static function parseModelIdList( string $optionName ): array {
+		$option = get_option( $optionName, '' );
 
 		if ( ! is_string( $option ) || '' === $option ) {
 			return [];

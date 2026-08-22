@@ -88,6 +88,16 @@ final class SettingsPage {
 
 		register_setting(
 			self::OPTION_GROUP,
+			Config::OPTION_JSON_MODELS,
+			[
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_textarea_field',
+				'default'           => '',
+			]
+		);
+
+		register_setting(
+			self::OPTION_GROUP,
 			Config::OPTION_REQUEST_TIMEOUT,
 			[
 				'type'              => 'number',
@@ -123,6 +133,14 @@ final class SettingsPage {
 			Config::OPTION_VISION_MODELS,
 			__( 'Vision-Capable Models', 'ai-provider-for-litellm' ),
 			[ self::class, 'render_vision_models_field' ],
+			self::PAGE_SLUG,
+			'litellm_provider_main'
+		);
+
+		add_settings_field(
+			Config::OPTION_JSON_MODELS,
+			__( 'Structured Output-Capable Models', 'ai-provider-for-litellm' ),
+			[ self::class, 'render_json_models_field' ],
 			self::PAGE_SLUG,
 			'litellm_provider_main'
 		);
@@ -237,6 +255,25 @@ final class SettingsPage {
 		><?php echo esc_textarea( $value ); ?></textarea>
 		<p class="description">
 			<?php esc_html_e( 'Model IDs that accept image input, one per line or comma-separated. LiteLLM rarely reports this automatically for self-hosted models, so list any vision-capable models here to enable image description generation for them.', 'ai-provider-for-litellm' ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Renders the structured-output-capable models field.
+	 */
+	public static function render_json_models_field(): void {
+		$value = get_option( Config::OPTION_JSON_MODELS, '' );
+		?>
+		<textarea
+			id="litellm_json_models"
+			name="<?php echo esc_attr( Config::OPTION_JSON_MODELS ); ?>"
+			class="regular-text"
+			rows="3"
+			placeholder="llama3.1:8b"
+		><?php echo esc_textarea( $value ); ?></textarea>
+		<p class="description">
+			<?php esc_html_e( 'Model IDs that reliably return valid JSON matching a requested schema, one per line or comma-separated. Several built-in WordPress AI features (tag/category suggestions, etc.) require this and will fail with "no connected provider" for any model not listed here. Not every self-hosted model honors this correctly even on the same backend -- verify a model actually returns clean, schema-conformant JSON before adding it, otherwise those features will fail with a parsing error instead.', 'ai-provider-for-litellm' ); ?>
 		</p>
 		<?php
 	}

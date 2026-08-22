@@ -24,7 +24,6 @@ use WordPress\AiClient\Providers\Http\Enums\HttpMethodEnum;
 use WordPress\AiClient\Providers\Models\DTO\ModelMetadata;
 use WordPress\AiClient\Providers\Models\Enums\CapabilityEnum;
 use WordPress\LiteLLMAiProvider\Metadata\LiteLlmModelMetadataDirectory;
-use WordPress\LiteLLMAiProvider\Support\Config;
 
 final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 
@@ -60,7 +59,7 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 		);
 	}
 
-	public function test_text_generation_models_declare_json_output_support(): void {
+	public function test_text_generation_models_do_not_declare_json_output_support_by_default(): void {
 		$response = $this->jsonResponse(
 			[
 				'data' => [
@@ -76,8 +75,31 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 			$models[0]->getSupportedOptions()
 		);
 
-		$this->assertContains( 'outputMimeType', $optionNames );
-		$this->assertContains( 'outputSchema', $optionNames );
+		$this->assertNotContains( 'outputMimeType', $optionNames );
+		$this->assertNotContains( 'outputSchema', $optionNames );
+	}
+
+	public function test_json_capable_model_declares_json_output_support(): void {
+		$this->setJsonCapableModelIds( [ 'ollama/llama3' => true ] );
+
+		$response = $this->jsonResponse(
+			[
+				'data' => [
+					[ 'id' => 'ollama/llama3' ],
+					[ 'id' => 'ollama/mistral' ],
+				],
+			]
+		);
+
+		$models = $this->parse( $response );
+
+		$optionNamesFor = static function ( ModelMetadata $model ): array {
+			return array_map( static fn( $option ) => $option->getName()->value, $model->getSupportedOptions() );
+		};
+
+		$this->assertContains( 'outputMimeType', $optionNamesFor( $this->findModel( $models, 'ollama/llama3' ) ) );
+		$this->assertContains( 'outputSchema', $optionNamesFor( $this->findModel( $models, 'ollama/llama3' ) ) );
+		$this->assertNotContains( 'outputMimeType', $optionNamesFor( $this->findModel( $models, 'ollama/mistral' ) ) );
 	}
 
 	public function test_classifies_embedding_models_by_id_substring(): void {
@@ -157,7 +179,7 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 		);
 	}
 
-	public function test_fetch_model_info_vision_flags_parses_supports_vision(): void {
+	public function test_fetch_model_info_parses_capability_flags(): void {
 		Functions\expect( 'get_option' )
 			->with( 'litellm_api_base', '' )
 			->andReturn( 'https://litellm.example.com/v1' );
@@ -173,15 +195,15 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 							'data' => [
 								[
 									'model_name' => 'ollama/llava',
-									'model_info' => [ 'supports_vision' => true ],
+									'model_info' => [ 'supports_vision' => true, 'supports_response_schema' => false ],
 								],
 								[
 									'model_name' => 'ollama/llama3',
-									'model_info' => [ 'supports_vision' => false ],
+									'model_info' => [ 'supports_vision' => false, 'supports_response_schema' => true ],
 								],
 								[
 									'model_name' => 'ollama/mistral',
-									'model_info' => [ 'supports_vision' => null ],
+									'model_info' => [ 'supports_vision' => null, 'supports_response_schema' => null ],
 								],
 								[
 									'model_name' => 'no-model-info',
@@ -193,21 +215,21 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 			)
 		);
 
-		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfoVisionFlags' );
-		$flags = $ref->invoke( $this->directory );
+		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfo' );
+		$info = $ref->invoke( $this->directory );
 
 		$this->assertSame(
 			[
-				'ollama/llava'   => true,
-				'ollama/llama3'  => false,
-				'ollama/mistral' => false,
-				'no-model-info'  => false,
+				'ollama/llava'   => [ 'supports_vision' => true, 'supports_response_schema' => false ],
+				'ollama/llama3'  => [ 'supports_vision' => false, 'supports_response_schema' => true ],
+				'ollama/mistral' => [ 'supports_vision' => false, 'supports_response_schema' => false ],
+				'no-model-info'  => [ 'supports_vision' => false, 'supports_response_schema' => false ],
 			],
-			$flags
+			$info
 		);
 	}
 
-	public function test_fetch_model_info_vision_flags_returns_empty_on_unsuccessful_response(): void {
+	public function test_fetch_model_info_returns_empty_on_unsuccessful_response(): void {
 		Functions\expect( 'get_option' )
 			->with( 'litellm_api_base', '' )
 			->andReturn( 'https://litellm.example.com/v1' );
@@ -215,11 +237,11 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 		$this->directory->setRequestAuthentication( new PassthroughRequestAuthentication() );
 		$this->directory->setHttpTransporter( new StubHttpTransporter( new Response( 404, [], '' ) ) );
 
-		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfoVisionFlags' );
+		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfo' );
 		$this->assertSame( [], $ref->invoke( $this->directory ) );
 	}
 
-	public function test_fetch_model_info_vision_flags_returns_empty_when_transporter_throws(): void {
+	public function test_fetch_model_info_returns_empty_when_transporter_throws(): void {
 		Functions\expect( 'get_option' )
 			->with( 'litellm_api_base', '' )
 			->andReturn( 'https://litellm.example.com/v1' );
@@ -227,50 +249,26 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 		$this->directory->setRequestAuthentication( new PassthroughRequestAuthentication() );
 		$this->directory->setHttpTransporter( new ThrowingHttpTransporter() );
 
-		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfoVisionFlags' );
+		$ref = new ReflectionMethod( $this->directory, 'fetchModelInfo' );
 		$this->assertSame( [], $ref->invoke( $this->directory ) );
 	}
 
-	public function test_resolve_vision_capable_model_ids_unions_config_override_and_model_info(): void {
-		Functions\when( 'get_option' )->alias(
-			static function ( string $option, $default = false ) {
-				if ( 'litellm_api_base' === $option ) {
-					return 'https://litellm.example.com/v1';
-				}
-				if ( Config::OPTION_VISION_MODELS === $option ) {
-					return 'manually-overridden-model';
-				}
-				return $default;
-			}
+	public function test_resolve_capable_model_ids_unions_override_and_model_info(): void {
+		$ref = new ReflectionMethod( $this->directory, 'resolveCapableModelIds' );
+		$ids = $ref->invoke(
+			$this->directory,
+			[ 'manually-overridden-model' => true ],
+			[
+				'auto-detected-model' => [ 'supports_vision' => true, 'supports_response_schema' => false ],
+				'unrelated-model'     => [ 'supports_vision' => false, 'supports_response_schema' => false ],
+			],
+			'supports_vision'
 		);
-
-		$this->directory->setRequestAuthentication( new PassthroughRequestAuthentication() );
-		$this->directory->setHttpTransporter(
-			new StubHttpTransporter(
-				new Response(
-					200,
-					[],
-					(string) json_encode(
-						[
-							'data' => [
-								[
-									'model_name' => 'auto-detected-vision-model',
-									'model_info' => [ 'supports_vision' => true ],
-								],
-							],
-						]
-					)
-				)
-			)
-		);
-
-		$ref = new ReflectionMethod( $this->directory, 'resolveVisionCapableModelIds' );
-		$ids = $ref->invoke( $this->directory );
 
 		$this->assertSame(
 			[
-				'manually-overridden-model'  => true,
-				'auto-detected-vision-model' => true,
+				'manually-overridden-model' => true,
+				'auto-detected-model'       => true,
 			],
 			$ids
 		);
@@ -304,6 +302,14 @@ final class LiteLlmModelMetadataDirectoryTest extends TestCase {
 	 */
 	private function setVisionCapableModelIds( array $ids ): void {
 		$prop = new ReflectionProperty( $this->directory, 'visionCapableModelIds' );
+		$prop->setValue( $this->directory, $ids );
+	}
+
+	/**
+	 * @param array<string, true> $ids
+	 */
+	private function setJsonCapableModelIds( array $ids ): void {
+		$prop = new ReflectionProperty( $this->directory, 'jsonCapableModelIds' );
 		$prop->setValue( $this->directory, $ids );
 	}
 

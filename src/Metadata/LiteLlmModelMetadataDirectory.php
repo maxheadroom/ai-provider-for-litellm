@@ -34,11 +34,19 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 
 	/**
 	 * Model IDs (as keys) known to accept image input, resolved fresh for each
-	 * `sendListModelsRequest()` call. See `resolveVisionCapableModelIds()`.
+	 * `sendListModelsRequest()` call. See `resolveCapableModelIds()`.
 	 *
 	 * @var array<string, true>
 	 */
 	private array $visionCapableModelIds = [];
+
+	/**
+	 * Model IDs (as keys) known to reliably honor structured JSON output, resolved
+	 * fresh for each `sendListModelsRequest()` call. See `resolveCapableModelIds()`.
+	 *
+	 * @var array<string, true>
+	 */
+	private array $jsonCapableModelIds = [];
 
 	/**
 	 * {@inheritDoc}
@@ -51,7 +59,11 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 	 * {@inheritDoc}
 	 */
 	protected function sendListModelsRequest(): array {
-		$this->visionCapableModelIds = $this->resolveVisionCapableModelIds();
+		$modelInfo = $this->fetchModelInfo();
+
+		$this->visionCapableModelIds = $this->resolveCapableModelIds( Config::visionModelIds(), $modelInfo, 'supports_vision' );
+		$this->jsonCapableModelIds   = $this->resolveCapableModelIds( Config::jsonModelIds(), $modelInfo, 'supports_response_schema' );
+
 		return parent::sendListModelsRequest();
 	}
 
@@ -107,7 +119,7 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 			$inputModalitySets[] = [ ModalityEnum::text(), ModalityEnum::image() ];
 		}
 
-		return [
+		$options = [
 			new SupportedOption( OptionEnum::inputModalities(), $inputModalitySets ),
 			new SupportedOption( OptionEnum::outputModalities(), [ [ ModalityEnum::text() ] ] ),
 			new SupportedOption( OptionEnum::temperature() ),
@@ -116,13 +128,20 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 			new SupportedOption( OptionEnum::stopSequences() ),
 			new SupportedOption( OptionEnum::systemInstruction() ),
 			new SupportedOption( OptionEnum::functionDeclarations() ),
-			// JSON-mode/structured output (WordPress core's own Content Classification,
-			// Type Ahead, etc. abilities require this to consider a provider usable at
-			// all). See LiteLlmTextGenerationModel::prepareResponseFormatParam() for the
-			// corrected request envelope this relies on.
-			new SupportedOption( OptionEnum::outputMimeType() ),
-			new SupportedOption( OptionEnum::outputSchema() ),
 		];
+
+		// JSON-mode/structured output (WordPress core's own Content Classification,
+		// Type Ahead, etc. abilities require this to consider a provider usable at all).
+		// Not every self-hosted model reliably honors `response_format` even via the same
+		// LiteLLM/Ollama backend -- confirmed live: some silently ignore it and return
+		// free-form prose, which then fails downstream JSON parsing -- so, like vision,
+		// this is opt-in per model rather than assumed for every discovered model.
+		if ( isset( $this->jsonCapableModelIds[ $modelId ] ) ) {
+			$options[] = new SupportedOption( OptionEnum::outputMimeType() );
+			$options[] = new SupportedOption( OptionEnum::outputSchema() );
+		}
+
+		return $options;
 	}
 
 	/**
@@ -133,35 +152,37 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 	}
 
 	/**
-	 * Resolves the set of model IDs to treat as vision-capable: the admin-configured
-	 * override list, unioned with any model LiteLLM's own metadata reports as such.
+	 * Resolves a set of model IDs known to support a given capability: the
+	 * admin-configured override list, unioned with any model LiteLLM's own
+	 * `/model/info` metadata reports as such via the given field.
 	 *
+	 * @param array<string, true>                     $override  Admin-configured model IDs.
+	 * @param array<string, array<string, bool|null>> $modelInfo Per-model `/model/info` fields, see `fetchModelInfo()`.
+	 * @param string                                  $field     The `model_info` field to check (e.g. `supports_vision`).
 	 * @return array<string, true>
 	 */
-	private function resolveVisionCapableModelIds(): array {
-		$ids = Config::visionModelIds();
-
-		foreach ( $this->fetchModelInfoVisionFlags() as $id => $supportsVision ) {
-			if ( $supportsVision ) {
-				$ids[ $id ] = true;
+	private function resolveCapableModelIds( array $override, array $modelInfo, string $field ): array {
+		foreach ( $modelInfo as $id => $fields ) {
+			if ( true === ( $fields[ $field ] ?? null ) ) {
+				$override[ $id ] = true;
 			}
 		}
 
-		return $ids;
+		return $override;
 	}
 
 	/**
 	 * Fetches LiteLLM's proxy-specific `GET /model/info` endpoint and extracts each
-	 * model's `supports_vision` flag, where reported.
+	 * model's relevant capability flags, where reported.
 	 *
 	 * This endpoint is a LiteLLM extension, not part of the OpenAI API spec — some
 	 * deployments or API keys may not have access to it. Any failure here (missing
 	 * route, insufficient permissions, malformed response) must not break ordinary
 	 * model discovery, so it degrades to "no automatic signal" rather than throwing.
 	 *
-	 * @return array<string, bool> Model ID => supports_vision.
+	 * @return array<string, array{supports_vision: bool, supports_response_schema: bool}> Model ID => capability flags.
 	 */
-	private function fetchModelInfoVisionFlags(): array {
+	private function fetchModelInfo(): array {
 		try {
 			$request  = $this->createRequest( HttpMethodEnum::GET(), 'model/info' );
 			$request  = $this->getRequestAuthentication()->authenticateRequest( $request );
@@ -174,19 +195,22 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 			$data    = $response->getData();
 			$entries = isset( $data['data'] ) && is_array( $data['data'] ) ? $data['data'] : [];
 
-			$flags = [];
+			$info = [];
 			foreach ( $entries as $entry ) {
 				if ( ! is_array( $entry ) || ! isset( $entry['model_name'] ) || ! is_string( $entry['model_name'] ) ) {
 					continue;
 				}
 
-				$modelInfo      = $entry['model_info'] ?? null;
-				$supportsVision = is_array( $modelInfo ) ? ( $modelInfo['supports_vision'] ?? null ) : null;
+				$modelInfo = $entry['model_info'] ?? null;
+				$modelInfo = is_array( $modelInfo ) ? $modelInfo : [];
 
-				$flags[ $entry['model_name'] ] = true === $supportsVision;
+				$info[ $entry['model_name'] ] = [
+					'supports_vision'          => true === ( $modelInfo['supports_vision'] ?? null ),
+					'supports_response_schema' => true === ( $modelInfo['supports_response_schema'] ?? null ),
+				];
 			}
 
-			return $flags;
+			return $info;
 		} catch ( Throwable $e ) {
 			return [];
 		}

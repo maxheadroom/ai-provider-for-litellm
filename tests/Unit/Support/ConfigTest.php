@@ -97,6 +97,30 @@ final class ConfigTest extends TestCase {
 		);
 	}
 
+	public function test_json_model_ids_returns_empty_for_blank_option(): void {
+		Functions\expect( 'get_option' )
+			->once()
+			->with( Config::OPTION_JSON_MODELS, '' )
+			->andReturn( '' );
+
+		$this->assertSame( [], Config::jsonModelIds() );
+	}
+
+	public function test_json_model_ids_parses_comma_and_newline_separated_list(): void {
+		Functions\expect( 'get_option' )
+			->once()
+			->with( Config::OPTION_JSON_MODELS, '' )
+			->andReturn( "llama3.1:8b, gpt-4o\n" );
+
+		$this->assertSame(
+			[
+				'llama3.1:8b' => true,
+				'gpt-4o'      => true,
+			],
+			Config::jsonModelIds()
+		);
+	}
+
 	public function test_request_timeout_prefers_wp_option(): void {
 		Functions\expect( 'get_option' )
 			->once()
