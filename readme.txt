@@ -4,7 +4,7 @@ Tags: ai, litellm, ollama, ai-client
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,8 +23,9 @@ Text generation supports image input (i.e. describing an image in text, such as 
 * **API Key** — set on **Settings → Connectors**, or via the `LITELLM_API_KEY` environment variable / PHP constant.
 * **API Base URL** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_API_BASE` environment variable. Defaults to `http://localhost:4000/v1`.
 * **Vision-Capable Models** — set on **Settings → LiteLLM Provider**: a list of model IDs (one per line, or comma-separated) that accept image input.
+* **Request Timeout** — set on **Settings → LiteLLM Provider**, or via the `LITELLM_REQUEST_TIMEOUT` environment variable (seconds). Defaults to 30. Applies to text generation requests only; increase it if you're using slower local models that take longer than 30 seconds to respond. The plugin also raises PHP's own `max_execution_time` to match before sending the request (see below), since that would otherwise cut a request short regardless of this setting.
 
-Precedence for the API key and base URL is: WordPress option, then environment variable / constant, then default.
+Precedence for the API key, base URL, and request timeout is: WordPress option, then environment variable / constant, then default.
 
 = Image description generation =
 
@@ -43,7 +44,9 @@ Whether the underlying model actually produces a useful description is up to tha
 
 * **No streaming.** The SDK's OpenAI-compatible text generation base class sends and parses one full response per request; there is no chunked/SSE code path to hook into.
 * **No text-to-image generation, embeddings-as-a-first-class-feature, or other modalities yet.** Chat-style text generation (including image-input description, see above) is what's implemented so far.
-* **No custom retry/backoff.** Requests use explicit timeouts (30s request / 10s connect) but a failed request is not automatically retried.
+* **No custom retry/backoff.** Requests use the configured timeout (see above) but a failed or timed-out request is not automatically retried.
+* **PHP's `max_execution_time` is only raised on a best-effort basis.** The plugin calls `set_time_limit()` before sending a text generation request, matching it to the configured Request Timeout. This does nothing if your host has disabled `set_time_limit` (some do, via `disable_functions`), and it cannot raise separate hard limits some environments impose outside PHP itself -- e.g. PHP-FPM's `request_terminate_timeout`, or a web server/reverse-proxy read timeout. If generation still fails around a suspiciously round number of seconds (30s and 60s are common defaults) after increasing the Request Timeout setting, check those first.
+* **Model discovery requests (`GET /v1/models`, `GET /model/info`) have no explicit timeout**, unlike text generation — they use WordPress core's own default HTTP timeout (5 seconds, filterable via the `http_request_timeout` core filter), which can be tight for a slow or cold-starting LiteLLM instance.
 * Because LiteLLM can proxy arbitrary, differently-named underlying models, this plugin cannot infer each model's true capabilities from its ID the way a single-vendor provider can. Every model returned by `GET /v1/models` is assumed to support text generation, unless its ID contains "embed", in which case it's assumed to be an embedding model instead. Vision-capability detection is documented separately above.
 
 == Installation ==
@@ -54,8 +57,18 @@ Whether the underlying model actually produces a useful description is up to tha
 
 == Changelog ==
 
+= 0.2.1 =
+* Merge image description generation with the configurable request timeout and execution-time-limit fix below.
+
 = 0.2.0 =
 * Add image description generation: models marked vision-capable (manually, or via LiteLLM's `/model/info`) can now accept image input for text generation.
+
+= 0.1.2 =
+* Raise PHP's `max_execution_time` (via `set_time_limit()`) to match the configured Request Timeout before sending a text generation request. Previously, a slow model response could be killed by PHP's own default execution time limit (commonly 30 seconds) well before a longer configured Request Timeout was ever reached.
+
+= 0.1.1 =
+* Make the text generation request timeout configurable (Settings → LiteLLM Provider, or `LITELLM_REQUEST_TIMEOUT`), default unchanged at 30 seconds.
+* Remove the connect-timeout setting: confirmed it had no effect under WordPress's own HTTP client, which only supports a single overall request timeout.
 
 = 0.1.0 =
 * Initial release: text generation, model discovery/availability, and base-URL/default-model settings.

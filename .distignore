@@ -11,6 +11,7 @@ composer.lock
 phpcs.xml.dist
 phpstan.neon.dist
 phpunit.xml.dist
+patchwork.json
 tests
 vendor
 node_modules

@@ -86,6 +86,16 @@ final class SettingsPage {
 			]
 		);
 
+		register_setting(
+			self::OPTION_GROUP,
+			Config::OPTION_REQUEST_TIMEOUT,
+			[
+				'type'              => 'number',
+				'sanitize_callback' => [ self::class, 'sanitize_request_timeout' ],
+				'default'           => Config::DEFAULT_REQUEST_TIMEOUT,
+			]
+		);
+
 		add_settings_section(
 			'litellm_provider_main',
 			'',
@@ -116,6 +126,14 @@ final class SettingsPage {
 			self::PAGE_SLUG,
 			'litellm_provider_main'
 		);
+
+		add_settings_field(
+			Config::OPTION_REQUEST_TIMEOUT,
+			__( 'Request Timeout (seconds)', 'ai-provider-for-litellm' ),
+			[ self::class, 'render_request_timeout_field' ],
+			self::PAGE_SLUG,
+			'litellm_provider_main'
+		);
 	}
 
 	/**
@@ -142,6 +160,25 @@ final class SettingsPage {
 		}
 
 		return untrailingslashit( esc_url_raw( $value ) );
+	}
+
+	/**
+	 * Sanitizes the submitted request timeout, rejecting non-positive values.
+	 *
+	 * @param mixed $value Raw submitted value.
+	 */
+	public static function sanitize_request_timeout( $value ): float {
+		if ( is_numeric( $value ) && (float) $value > 0 ) {
+			return (float) $value;
+		}
+
+		add_settings_error(
+			Config::OPTION_REQUEST_TIMEOUT,
+			'litellm_invalid_request_timeout',
+			__( 'The request timeout must be a positive number of seconds.', 'ai-provider-for-litellm' )
+		);
+
+		return Config::requestTimeout();
 	}
 
 	/**
@@ -200,6 +237,33 @@ final class SettingsPage {
 		><?php echo esc_textarea( $value ); ?></textarea>
 		<p class="description">
 			<?php esc_html_e( 'Model IDs that accept image input, one per line or comma-separated. LiteLLM rarely reports this automatically for self-hosted models, so list any vision-capable models here to enable image description generation for them.', 'ai-provider-for-litellm' ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Renders the request timeout field.
+	 */
+	public static function render_request_timeout_field(): void {
+		$value = get_option( Config::OPTION_REQUEST_TIMEOUT, Config::DEFAULT_REQUEST_TIMEOUT );
+		?>
+		<input
+			type="number"
+			id="litellm_request_timeout"
+			name="<?php echo esc_attr( Config::OPTION_REQUEST_TIMEOUT ); ?>"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="small-text"
+			min="0"
+			step="1"
+		/>
+		<p class="description">
+			<?php
+			printf(
+				/* translators: %s: default timeout in seconds. */
+				esc_html__( 'How long to wait for a text generation response before failing. Defaults to %s seconds if left blank or invalid.', 'ai-provider-for-litellm' ),
+				esc_html( (string) Config::DEFAULT_REQUEST_TIMEOUT )
+			);
+			?>
 		</p>
 		<?php
 	}
