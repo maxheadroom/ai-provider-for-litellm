@@ -58,4 +58,44 @@ final class LiteLlmTextGenerationModelTest extends TestCase {
 		$this->assertSame( 'https://litellm.example.com/v1/chat/completions', $request->getUri() );
 		$this->assertSame( $options, $request->getOptions() );
 	}
+
+	public function test_create_request_extends_execution_time_limit_based_on_configured_timeout(): void {
+		Functions\expect( 'get_option' )
+			->with( 'litellm_api_base', '' )
+			->andReturn( 'https://litellm.example.com/v1' );
+		Functions\expect( 'set_time_limit' )
+			->once()
+			->with( 35 ); // 30s configured timeout + 5s buffer.
+
+		$modelMetadata = new ModelMetadata( 'ollama/llama3', 'ollama/llama3', [], [] );
+		$providerMetadata = new ProviderMetadata( 'litellm', 'LiteLLM (Ollama)', ProviderTypeEnum::server() );
+
+		$model = new LiteLlmTextGenerationModel( $modelMetadata, $providerMetadata );
+
+		$options = new RequestOptions();
+		$options->setTimeout( 30.0 );
+		$model->setRequestOptions( $options );
+
+		$ref = new ReflectionMethod( $model, 'createRequest' );
+		$request = $ref->invoke( $model, HttpMethodEnum::POST(), 'chat/completions', [], null );
+
+		$this->assertSame( 'https://litellm.example.com/v1/chat/completions', $request->getUri() );
+	}
+
+	public function test_create_request_does_not_extend_execution_time_limit_without_request_options(): void {
+		Functions\expect( 'get_option' )
+			->with( 'litellm_api_base', '' )
+			->andReturn( 'https://litellm.example.com/v1' );
+		Functions\expect( 'set_time_limit' )->never();
+
+		$modelMetadata = new ModelMetadata( 'ollama/llama3', 'ollama/llama3', [], [] );
+		$providerMetadata = new ProviderMetadata( 'litellm', 'LiteLLM (Ollama)', ProviderTypeEnum::server() );
+
+		$model = new LiteLlmTextGenerationModel( $modelMetadata, $providerMetadata );
+
+		$ref = new ReflectionMethod( $model, 'createRequest' );
+		$request = $ref->invoke( $model, HttpMethodEnum::POST(), 'chat/completions', [], null );
+
+		$this->assertSame( 'https://litellm.example.com/v1/chat/completions', $request->getUri() );
+	}
 }

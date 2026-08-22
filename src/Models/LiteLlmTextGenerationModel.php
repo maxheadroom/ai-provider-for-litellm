@@ -23,9 +23,44 @@ use WordPress\LiteLLMAiProvider\Provider\LiteLlmProvider;
 final class LiteLlmTextGenerationModel extends AbstractOpenAiCompatibleTextGenerationModel {
 
 	/**
+	 * Extra seconds added on top of the configured HTTP timeout when raising PHP's
+	 * execution time limit, to leave headroom for response parsing overhead.
+	 */
+	private const EXECUTION_TIME_BUFFER = 5;
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function createRequest( HttpMethodEnum $method, string $path, array $headers = [], $data = null ): Request {
+		$this->extendExecutionTimeLimit();
 		return new Request( $method, LiteLlmProvider::url( $path ), $headers, $data, $this->getRequestOptions() );
+	}
+
+	/**
+	 * Raises PHP's max_execution_time to accommodate the configured HTTP timeout.
+	 *
+	 * Local/self-hosted models can easily take longer to respond than PHP's default
+	 * max_execution_time (commonly 30s), which would otherwise fatally terminate the
+	 * whole request before our own, longer-configured HTTP timeout is ever reached.
+	 *
+	 * This only affects PHP's own execution-time counter; it cannot raise a hard
+	 * process-level limit some environments impose separately (e.g. PHP-FPM's
+	 * `request_terminate_timeout`, or a web server/reverse-proxy read timeout) --
+	 * those must still be adjusted at the hosting level if they're shorter than the
+	 * configured request timeout.
+	 */
+	private function extendExecutionTimeLimit(): void {
+		if ( ! function_exists( 'set_time_limit' ) ) {
+			return;
+		}
+
+		$timeout = null !== $this->getRequestOptions() ? $this->getRequestOptions()->getTimeout() : null;
+
+		if ( null === $timeout ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- set_time_limit() has no error return to check; suppressing avoids a warning when hosts disable it via disable_functions.
+		@set_time_limit( (int) ceil( $timeout ) + self::EXECUTION_TIME_BUFFER );
 	}
 }
