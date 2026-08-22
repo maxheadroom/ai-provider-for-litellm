@@ -19,6 +19,8 @@ use WordPress\AiClient\Providers\Models\Enums\CapabilityEnum;
 use WordPress\AiClient\Providers\Models\Enums\OptionEnum;
 use WordPress\AiClient\Providers\OpenAiCompatibleImplementation\AbstractOpenAiCompatibleModelMetadataDirectory;
 use WordPress\LiteLLMAiProvider\Provider\LiteLlmProvider;
+use WordPress\LiteLLMAiProvider\Support\Config;
+use Throwable;
 
 /**
  * Discovers models exposed by LiteLLM's OpenAI-compatible `GET /v1/models` endpoint.
@@ -31,10 +33,26 @@ use WordPress\LiteLLMAiProvider\Provider\LiteLlmProvider;
 final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadataDirectory {
 
 	/**
+	 * Model IDs (as keys) known to accept image input, resolved fresh for each
+	 * `sendListModelsRequest()` call. See `resolveVisionCapableModelIds()`.
+	 *
+	 * @var array<string, true>
+	 */
+	private array $visionCapableModelIds = [];
+
+	/**
 	 * {@inheritDoc}
 	 */
 	protected function createRequest( HttpMethodEnum $method, string $path, array $headers = [], $data = null ): Request {
 		return new Request( $method, LiteLlmProvider::url( $path ), $headers, $data );
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	protected function sendListModelsRequest(): array {
+		$this->visionCapableModelIds = $this->resolveVisionCapableModelIds();
+		return parent::sendListModelsRequest();
 	}
 
 	/**
@@ -84,8 +102,13 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 			];
 		}
 
+		$inputModalitySets = [ [ ModalityEnum::text() ] ];
+		if ( isset( $this->visionCapableModelIds[ $modelId ] ) ) {
+			$inputModalitySets[] = [ ModalityEnum::text(), ModalityEnum::image() ];
+		}
+
 		return [
-			new SupportedOption( OptionEnum::inputModalities(), [ [ ModalityEnum::text() ] ] ),
+			new SupportedOption( OptionEnum::inputModalities(), $inputModalitySets ),
 			new SupportedOption( OptionEnum::outputModalities(), [ [ ModalityEnum::text() ] ] ),
 			new SupportedOption( OptionEnum::temperature() ),
 			new SupportedOption( OptionEnum::topP() ),
@@ -101,5 +124,65 @@ final class LiteLlmModelMetadataDirectory extends AbstractOpenAiCompatibleModelM
 	 */
 	private function looksLikeEmbeddingModel( string $modelId ): bool {
 		return false !== strpos( strtolower( $modelId ), 'embed' );
+	}
+
+	/**
+	 * Resolves the set of model IDs to treat as vision-capable: the admin-configured
+	 * override list, unioned with any model LiteLLM's own metadata reports as such.
+	 *
+	 * @return array<string, true>
+	 */
+	private function resolveVisionCapableModelIds(): array {
+		$ids = Config::visionModelIds();
+
+		foreach ( $this->fetchModelInfoVisionFlags() as $id => $supportsVision ) {
+			if ( $supportsVision ) {
+				$ids[ $id ] = true;
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Fetches LiteLLM's proxy-specific `GET /model/info` endpoint and extracts each
+	 * model's `supports_vision` flag, where reported.
+	 *
+	 * This endpoint is a LiteLLM extension, not part of the OpenAI API spec — some
+	 * deployments or API keys may not have access to it. Any failure here (missing
+	 * route, insufficient permissions, malformed response) must not break ordinary
+	 * model discovery, so it degrades to "no automatic signal" rather than throwing.
+	 *
+	 * @return array<string, bool> Model ID => supports_vision.
+	 */
+	private function fetchModelInfoVisionFlags(): array {
+		try {
+			$request  = $this->createRequest( HttpMethodEnum::GET(), 'model/info' );
+			$request  = $this->getRequestAuthentication()->authenticateRequest( $request );
+			$response = $this->getHttpTransporter()->send( $request );
+
+			if ( ! $response->isSuccessful() ) {
+				return [];
+			}
+
+			$data    = $response->getData();
+			$entries = isset( $data['data'] ) && is_array( $data['data'] ) ? $data['data'] : [];
+
+			$flags = [];
+			foreach ( $entries as $entry ) {
+				if ( ! is_array( $entry ) || ! isset( $entry['model_name'] ) || ! is_string( $entry['model_name'] ) ) {
+					continue;
+				}
+
+				$modelInfo      = $entry['model_info'] ?? null;
+				$supportsVision = is_array( $modelInfo ) ? ( $modelInfo['supports_vision'] ?? null ) : null;
+
+				$flags[ $entry['model_name'] ] = true === $supportsVision;
+			}
+
+			return $flags;
+		} catch ( Throwable $e ) {
+			return [];
+		}
 	}
 }

@@ -4,7 +4,7 @@
  * Description:       Registers an AI Client provider that talks to a LiteLLM gateway (e.g. backed by Ollama) using the OpenAI-compatible wire protocol.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           0.1.0
+ * Version:           0.2.0
  * Author:            LiteLLM AI Provider Contributors
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html

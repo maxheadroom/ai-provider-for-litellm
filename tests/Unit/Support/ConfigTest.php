@@ -69,4 +69,29 @@ final class ConfigTest extends TestCase {
 
 		$this->assertSame( 'ollama/llama3', Config::defaultModel() );
 	}
+
+	public function test_vision_model_ids_returns_empty_for_blank_option(): void {
+		Functions\expect( 'get_option' )
+			->once()
+			->with( Config::OPTION_VISION_MODELS, '' )
+			->andReturn( '' );
+
+		$this->assertSame( [], Config::visionModelIds() );
+	}
+
+	public function test_vision_model_ids_parses_comma_and_newline_separated_list(): void {
+		Functions\expect( 'get_option' )
+			->once()
+			->with( Config::OPTION_VISION_MODELS, '' )
+			->andReturn( " ollama/llava, gpt-4o\n\nclaude-3-opus \r\n gpt-4o " );
+
+		$this->assertSame(
+			[
+				'ollama/llava' => true,
+				'gpt-4o'       => true,
+				'claude-3-opus' => true,
+			],
+			Config::visionModelIds()
+		);
+	}
 }

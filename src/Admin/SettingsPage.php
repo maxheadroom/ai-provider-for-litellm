@@ -76,6 +76,16 @@ final class SettingsPage {
 			]
 		);
 
+		register_setting(
+			self::OPTION_GROUP,
+			Config::OPTION_VISION_MODELS,
+			[
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_textarea_field',
+				'default'           => '',
+			]
+		);
+
 		add_settings_section(
 			'litellm_provider_main',
 			'',
@@ -95,6 +105,14 @@ final class SettingsPage {
 			Config::OPTION_DEFAULT_MODEL,
 			__( 'Default Model', 'ai-provider-for-litellm' ),
 			[ self::class, 'render_default_model_field' ],
+			self::PAGE_SLUG,
+			'litellm_provider_main'
+		);
+
+		add_settings_field(
+			Config::OPTION_VISION_MODELS,
+			__( 'Vision-Capable Models', 'ai-provider-for-litellm' ),
+			[ self::class, 'render_vision_models_field' ],
 			self::PAGE_SLUG,
 			'litellm_provider_main'
 		);
@@ -164,6 +182,25 @@ final class SettingsPage {
 			class="regular-text"
 			placeholder="ollama/llama3"
 		/>
+		<?php
+	}
+
+	/**
+	 * Renders the vision-capable models field.
+	 */
+	public static function render_vision_models_field(): void {
+		$value = get_option( Config::OPTION_VISION_MODELS, '' );
+		?>
+		<textarea
+			id="litellm_vision_models"
+			name="<?php echo esc_attr( Config::OPTION_VISION_MODELS ); ?>"
+			class="regular-text"
+			rows="3"
+			placeholder="ollama/llava&#10;gpt-4o"
+		><?php echo esc_textarea( $value ); ?></textarea>
+		<p class="description">
+			<?php esc_html_e( 'Model IDs that accept image input, one per line or comma-separated. LiteLLM rarely reports this automatically for self-hosted models, so list any vision-capable models here to enable image description generation for them.', 'ai-provider-for-litellm' ); ?>
+		</p>
 		<?php
 	}
 
