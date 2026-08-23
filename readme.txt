@@ -65,16 +65,23 @@ As with vision, LiteLLM's own metadata is unreliable for self-hosted models (it'
 == Installation ==
 
 1. Install and activate this plugin alongside the official [AI](https://github.com/WordPress/ai) plugin (or on WordPress 7.0+, where the AI Client SDK ships in core).
-2. Go to **Settings → Connectors** and enter your LiteLLM API key for "LiteLLM (Ollama)".
-3. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
+2. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
+3. Go to **Settings → Connectors** and enter your LiteLLM API key for "LiteLLM (Ollama)".
+
 
 == Updates ==
 
 This plugin isn't listed on the WordPress.org plugin directory, so wp-admin's update mechanism doesn't know about it out of the box. It bundles [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) to fill that gap, pointed at a small `update.json` metadata file (currently served from this repository's `main` branch) rather than at any particular Git host's release API — deliberately, so the distribution host can move (e.g. from GitHub to a self-hosted Gitea/Forgejo instance) without touching the plugin's code, only where `update.json` points its `download_url`.
 
-To install: download the ZIP linked from [`update.json`](https://raw.githubusercontent.com/maxheadroom/ai-provider-for-litellm/main/update.json) and upload it via **Plugins → Add New → Upload Plugin**. From then on, updates appear in wp-admin like any other plugin. Publishing a new version means bumping `version` and `download_url` in `update.json` alongside the release — this is a manually maintained file, not auto-generated from tags.
+To install: download the ZIP linked from [Releases](https://repos.mxhdr.net/maxheadroom/ai-provider-for-litellm/releases) and upload it via **Plugins → Add New → Upload Plugin**. From then on, updates appear in wp-admin like any other plugin. Publishing a new version means bumping `version` and `download_url` in `update.json` alongside the release — this is a manually maintained file, not auto-generated from tags.
 
 == Changelog ==
+
+= 0.4.1 =
+* Added README.md for the git repo
+* updated README.md to reflect the correct order of settings
+* updated README.md with the Forgejo URL of the plugin
+* updated readme.txt accordingly
 
 = 0.4.0 =
 * Add self-hosted update checks via a JSON metadata file (bundled Plugin Update Checker library), so sites installing this plugin outside the WordPress.org directory still get update notices in wp-admin. Deliberately forge-agnostic (a plain metadata URL, not a GitHub/GitLab/BitBucket-specific integration) since none of Plugin Update Checker's built-in VCS integrations support self-hosted Gitea/Forgejo. See "Updates" above.
