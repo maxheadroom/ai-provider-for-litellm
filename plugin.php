@@ -4,7 +4,7 @@
  * Description:       Registers an AI Client provider that talks to a LiteLLM gateway (e.g. backed by Ollama) using the OpenAI-compatible wire protocol.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           0.3.1
+ * Version:           0.4.0
  * Author:            Falko Zurell + Claude Code
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -21,6 +21,7 @@ use WordPress\AiClient\AiClient;
 use WordPress\LiteLLMAiProvider\Admin\SettingsPage;
 use WordPress\LiteLLMAiProvider\Provider\LiteLlmProvider;
 use WordPress\LiteLLMAiProvider\Support\Config;
+use WordPress\LiteLLMAiProvider\Support\UpdateChecker;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	return;
@@ -75,3 +76,4 @@ function raise_default_request_timeout( $timeout ): float {
 add_filter( 'wp_ai_client_default_request_timeout', __NAMESPACE__ . '\\raise_default_request_timeout' );
 
 SettingsPage::init();
+UpdateChecker::init( __FILE__ );

@@ -8,6 +8,7 @@
 bin
 composer.json
 composer.lock
+update.json
 phpcs.xml.dist
 phpstan.neon.dist
 phpunit.xml.dist

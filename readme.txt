@@ -4,7 +4,7 @@ Tags: ai, litellm, ollama, ai-client
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 0.3.1
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -68,7 +68,16 @@ As with vision, LiteLLM's own metadata is unreliable for self-hosted models (it'
 2. Go to **Settings → Connectors** and enter your LiteLLM API key for "LiteLLM (Ollama)".
 3. Go to **Settings → LiteLLM Provider** and set your LiteLLM gateway's base URL and a default model.
 
+== Updates ==
+
+This plugin isn't listed on the WordPress.org plugin directory, so wp-admin's update mechanism doesn't know about it out of the box. It bundles [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) to fill that gap, pointed at a small `update.json` metadata file (currently served from this repository's `main` branch) rather than at any particular Git host's release API — deliberately, so the distribution host can move (e.g. from GitHub to a self-hosted Gitea/Forgejo instance) without touching the plugin's code, only where `update.json` points its `download_url`.
+
+To install: download the ZIP linked from [`update.json`](https://raw.githubusercontent.com/maxheadroom/ai-provider-for-litellm/main/update.json) and upload it via **Plugins → Add New → Upload Plugin**. From then on, updates appear in wp-admin like any other plugin. Publishing a new version means bumping `version` and `download_url` in `update.json` alongside the release — this is a manually maintained file, not auto-generated from tags.
+
 == Changelog ==
+
+= 0.4.0 =
+* Add self-hosted update checks via a JSON metadata file (bundled Plugin Update Checker library), so sites installing this plugin outside the WordPress.org directory still get update notices in wp-admin. Deliberately forge-agnostic (a plain metadata URL, not a GitHub/GitLab/BitBucket-specific integration) since none of Plugin Update Checker's built-in VCS integrations support self-hosted Gitea/Forgejo. See "Updates" above.
 
 = 0.3.1 =
 * Make structured JSON output opt-in per model (new Structured Output-Capable Models setting), instead of declaring it for every discovered model. Confirmed live: not every self-hosted model reliably honors `response_format` even behind the exact same LiteLLM/Ollama backend as one that does -- an incapable model auto-selected by WordPress's resolver returned free-form prose instead of JSON, which then failed downstream parsing with "Could not parse AI response as valid suggestions." This mirrors the existing Vision-Capable Models pattern (manual list, unioned with LiteLLM's `/model/info` `supports_response_schema` flag when available).

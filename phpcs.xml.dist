@@ -5,6 +5,8 @@
 	<file>.</file>
 	<exclude-pattern>/vendor/*</exclude-pattern>
 	<exclude-pattern>/node_modules/*</exclude-pattern>
+	<!-- Bundled third-party library (Plugin Update Checker); not our code to hold to these standards. -->
+	<exclude-pattern>/lib/*</exclude-pattern>
 
 	<arg value="sp"/>
 	<arg name="basepath" value="."/>

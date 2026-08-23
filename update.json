@@ -1,0 +1,14 @@
+{
+	"name": "AI Provider for LiteLLM",
+	"slug": "ai-provider-for-litellm",
+	"version": "0.4.0",
+	"download_url": "https://github.com/maxheadroom/ai-provider-for-litellm/releases/download/v0.4.0/ai-provider-for-litellm-0.4.0.zip",
+	"homepage": "https://github.com/maxheadroom/ai-provider-for-litellm",
+	"requires": "7.0",
+	"requires_php": "7.4",
+	"tested": "7.1",
+	"sections": {
+		"description": "Registers an AI Client provider that talks to a LiteLLM gateway (e.g. backed by Ollama) using the OpenAI-compatible wire protocol.",
+		"changelog": "<h4>0.4.0</h4><ul><li>Add self-hosted update checks via a JSON metadata file, so sites installing this plugin outside the WordPress.org directory still get update notices in wp-admin.</li></ul>"
+	}
+}
